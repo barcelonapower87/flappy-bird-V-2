@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <title>Flappy Bird 2:V</title>
+    
+    <style>
+        /* =========================================================
+           1. ESCUDO CSS Y OPTIMIZACIÓN DE RESOLUCIÓN
+           ========================================================= */
+        * { -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }
+
+        html, body {
+            margin: 0; padding: 0; width: 100%; 
+            height: 100vh; height: 100dvh; 
+            display: flex; justify-content: center; align-items: center;
+            background-color: #050505; font-family: 'Courier New', Courier, monospace;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            overflow: hidden; overscroll-behavior: none; touch-action: none; 
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* =========================================================
+           2. CAJA DEL JUEGO Y CIELO VIVO
+           ========================================================= */
+        #caja-juego {
+            width: 450px; height: 750px; position: relative; overflow: hidden;
+            border: 4px solid #fff; border-radius: 14px; cursor: pointer; 
+            background: linear-gradient(180deg, #66ccff 0%, #4da6ff 38%, #2980b9 100%);
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(255,255,255,0.95), transparent 18%), 
+                radial-gradient(circle at 75% 18%, rgba(255,255,255,0.8), transparent 14%), 
+                linear-gradient(180deg, #66ccff 0%, #4da6ff 38%, #2980b9 100%);
+            filter: saturate(1.45) brightness(1.1) contrast(1.05) sepia(0.05);
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.15); 
+            touch-action: none; transform-origin: center center;
+            image-rendering: high-quality;
+        }
+
+        #capa-noche {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(180deg, #090e17 0%, #111a2e 45%, #1f2e4d 100%);
+            background-image:
+                radial-gradient(1.5px 1.5px at 20% 30%, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 60% 15%, #fff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 80% 40%, #fff, rgba(0,0,0,0)),
+                radial-gradient(2.5px 2.5px at 35% 65%, #fff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 75% 75%, #fff, rgba(0,0,0,0)),
+                linear-gradient(180deg, #090e17 0%, #111a2e 45%, #1f2e4d 100%);
+            opacity: 0; transition: opacity 8s ease-in-out; z-index: 1; pointer-events: none;
+        }
+
+        #luna {
+            position: absolute; left: 60%; bottom: -120px; width: 90px; height: 90px;
+            background: radial-gradient(circle at 30% 30%, #fffee0 0%, #fef9c3 60%, #fde047 100%);
+            border-radius: 50%; box-shadow: 0 0 60px rgba(254, 249, 195, 0.8), inset -10px -10px 20px rgba(0,0,0,0.15);
+            opacity: 0; transition: all 8s ease-in-out; z-index: 2; pointer-events: none;
+        }
+        #luna::after {
+            content: ''; position: absolute; top: 25%; left: 25%; width: 15px; height: 15px;
+            background: rgba(0,0,0,0.06); border-radius: 50%;
+            box-shadow: 25px 10px 0 -3px rgba(0,0,0,0.06), 10px 30px 0 -4px rgba(0,0,0,0.07);
+        }
+        #caja-juego.es-noche #capa-noche { opacity: 1; }
+        #caja-juego.es-noche #luna { bottom: 65%; opacity: 1; }
+
+        /* =========================================================
+           3. TUBOS
+           ========================================================= */
+        .tubo {
+            width: 70px; min-height: 40px; 
+            background: linear-gradient(180deg, #63d146 0%, #23851b 100%);
+            border: 3px solid #0f3811; border-top-left-radius: 12px; border-top-right-radius: 12px;
+            position: absolute; z-index: 10;
+            box-shadow: inset -5px 0 12px rgba(0,0,0,0.3), inset 5px 0 12px rgba(255,255,255,0.3);
+            will-change: transform; backface-visibility: hidden;
+        }
+        .tubo-inferior {
+            border-top-left-radius: 0; border-top-right-radius: 0;
+            border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+        }
+        .tubo::before {
+            content: ''; position: absolute; left: -10px; right: -10px; height: 26px; bottom: -26px;
+            background: linear-gradient(180deg, #8cf067 0%, #39a824 100%);
+            border: 3px solid #0f3811; border-top: none;
+            border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; z-index: 20;
+            box-shadow: inset -4px -4px 8px rgba(0,0,0,0.25), inset 4px 4px 8px rgba(255,255,255,0.4);
+        }
+        .tubo-inferior::before {
+            top: -26px; bottom: auto; border-top: 3px solid #0f3811; border-bottom: none;
+            border-top-left-radius: 14px; border-top-right-radius: 14px;
+            box-shadow: inset -4px 4px 8px rgba(0,0,0,0.25), inset 4px -4px 8px rgba(255,255,255,0.4);
+        }
+
+        /* =========================================================
+           4. EL PÁJARO Y SUS SKINS
+           ========================================================= */
+        #pajaro {
+            width: 45px; height: 45px; border: 3px solid #000; position: absolute; left: 50px; top: 0; 
+            border-radius: 50%; z-index: 20; transition: box-shadow 0.3s;
+            will-change: transform; backface-visibility: hidden;
+        }
+        #pajaro::before {
+            content: ''; position: absolute; width: 20px; height: 12px; left: 58%; top: 44%;
+            background: #ffdb4d; border: 2px solid #000; border-radius: 4px 10px 10px 4px;
+            transform: translate(-50%, -50%) rotate(-10deg); z-index: 1;
+            box-shadow: inset 2px 2px 4px rgba(255,255,255,0.5);
+        }
+        #pajaro::after {
+            content: ''; position: absolute; left: 28%; top: 25%; width: 10px; height: 10px;
+            background: #fff; border-radius: 50%; box-shadow: 2px 0 0 #000; z-index: 2;
+        }
+
+        .skin-0 { background: radial-gradient(circle at 30% 30%, #ff6b6b 0%, #d61a1a 55%, #7a0000 100%); box-shadow: 0 12px 25px rgba(0,0,0,0.4), inset -4px -4px 10px rgba(0,0,0,0.3), inset 4px 4px 10px rgba(255,255,255,0.4); }
+        .skin-1 { background: radial-gradient(circle at 30% 30%, #6be3ff 0%, #1a95d6 55%, #004b7a 100%); box-shadow: 0 12px 25px rgba(0,0,0,0.4), inset -4px -4px 10px rgba(0,0,0,0.3), inset 4px 4px 10px rgba(255,255,255,0.4); }
+        .skin-2 { background: radial-gradient(circle at 30% 30%, #a8ff6b 0%, #46d61a 55%, #197a00 100%); box-shadow: 0 12px 25px rgba(0,0,0,0.4), inset -4px -4px 10px rgba(0,0,0,0.3), inset 4px 4px 10px rgba(255,255,255,0.4); }
+        .skin-3 { background: radial-gradient(circle at 30% 30%, #888 0%, #222 55%, #000 100%); box-shadow: 0 12px 25px rgba(0,0,0,0.4), inset -4px -4px 10px rgba(0,0,0,0.3), inset 4px 4px 10px rgba(255,255,255,0.2); }
+        .skin-4 { background: radial-gradient(circle at 30% 30%, #ffea00 0%, #ff9d00 55%, #8a5500 100%); box-shadow: 0 12px 25px rgba(0,0,0,0.4), inset -4px -4px 10px rgba(0,0,0,0.3), inset 4px 4px 10px rgba(255,255,255,0.6); }
+
+        .skin-5 { background: radial-gradient(circle at 40% 40%, #ffffff 0%, #00e5ff 30%, #0044ff 100%); border: 3px solid #00ffff; animation: aura-electrica 0.1s infinite alternate; }
+        @keyframes aura-electrica { 0% { box-shadow: 0 0 15px #00d4ff, 0 0 25px #00d4ff, inset -4px -4px 15px #0000ff; } 100% { box-shadow: 0 0 35px #00ffff, 0 0 55px #00ffff, 0 0 80px #fff, inset 6px 6px 20px #fff; } }
+
+        .skin-6 { background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 10px), linear-gradient(135deg, #5c3a21 0%, #3e2615 100%); border: 4px solid #d9d9d9; animation: aura-acero 2s infinite alternate ease-in-out; }
+        @keyframes aura-acero { 0% { box-shadow: 0 0 10px rgba(255,255,255,0.3), inset 0 0 15px rgba(0,0,0,0.8), inset 0 0 5px #fff; } 100% { box-shadow: 0 0 30px rgba(200,220,255,0.7), inset 0 0 25px rgba(0,0,0,0.9), inset 0 0 15px #ffffff; } }
+
+        .skin-7 { background: linear-gradient(110deg, #f0f0f0 35%, #cc0000 35%, #990000 60%, #e0e0e0 60%); border: 3px solid #1a1a1a; animation: aura-fuego 0.6s infinite alternate; }
+        @keyframes aura-fuego { 0% { box-shadow: 0 5px 15px #ff3300, 0 10px 30px #ff9900, inset -5px -5px 15px rgba(0,0,0,0.4); } 100% { box-shadow: 0 10px 25px #ff3300, 0 20px 50px #ffcc00, 0 35px 70px #ff0000, inset 5px 5px 20px rgba(255,255,255,0.6); } }
+
+        .skin-8 { background: radial-gradient(circle at 50% 50%, #b30000 0%, #660000 40%, #1a0000 90%, #000000 100%); border: 3px solid #ff0000; animation: respiracion-demonio 1.5s infinite alternate ease-in-out; }
+        .skin-8.preview-skin::after, #caja-juego .skin-8::after { background: #ff1a1a; box-shadow: 0 0 12px #ff0000, 2px 0 0 #000; }
+        @keyframes respiracion-demonio { 0% { box-shadow: 0 0 20px #000, 0 0 30px #4a0000, inset -5px -5px 15px #000; border-width: 3px; } 100% { box-shadow: 0 0 50px #8b0000, 0 0 90px #ff0000, 0 0 120px #000, inset 8px 8px 25px #ff3333; border-width: 5px; } }
+
+        .skin-9 { background: radial-gradient(circle at 35% 35%, #2a2a2a 0%, #0a0a0a 60%, #000000 100%); border: 3px solid #aa00ff; animation: aura-dragon 1.2s infinite alternate ease-in-out; }
+        .skin-9.preview-skin::after, #caja-juego .skin-9::after { background: #d400ff; box-shadow: 0 0 15px #d400ff, 0 0 30px #aa00ff, 2px 0 0 #000; }
+        @keyframes aura-dragon { 0% { box-shadow: 0 0 15px #550080, 0 0 25px #aa00ff, inset -4px -4px 15px #000; } 100% { box-shadow: 0 0 40px #aa00ff, 0 0 70px #d400ff, 0 0 100px #aa00ff, inset 6px 6px 20px rgba(170,0,255,0.5); } }
+
+        /* =========================================================
+           5. INTERFAZ Y HUD
+           ========================================================= */
+        #pantalla-inicio, #pantalla-fin {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); color: white; display: flex;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; text-align: center; width: 100%; height: 100%;
+        }
+        #pantalla-fin { display: none; }
+
+        h1 { margin: 0; font-size: 50px; color: #ff3333; text-shadow: 3px 3px 0 #000; line-height: 1.1; }
+        h2 { margin: 5px 0; font-size: 35px; text-shadow: 2px 2px 0 #000; } 
+        .texto-record { color: #ffcc00; text-transform: uppercase; font-weight: 900; }
+
+        .hud-top {
+            position: absolute; top: 16px; color: white; font-size: 18px; font-weight: 900;
+            text-shadow: 2px 2px 0 #000; z-index: 110;
+        }
+        #info-controles { left: 16px; text-align: left; }
+        #record-display { right: 16px; color: #ffcc00; text-align: right; }
+        #display-monedas { top: 70px; right: 16px; color: #ffeb3b; }
+        
+        #marcador {
+            position: absolute; top: 40px; width: 100%; text-align: center;
+            font-size: 80px; font-weight: bold; color: white;
+            text-shadow: 4px 4px 0 #000; z-index: 50;
+        }
+
+        .contenedor-pasos {
+            background: rgba(30,30,30,0.95); padding: 20px; border-radius: 12px;
+            border: 4px solid #ffcc00; width: 90%; max-width: 360px; margin-top: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+        }
+
+        .contenedor-pasos h3 { margin: 0; text-align: center; width: 100%; }
+
+        .btn-opcion {
+            display: block; width: 100%; max-width: 280px; padding: 14px; margin: 0;
+            font-size: 18px; font-weight: 900; cursor: pointer;
+            background: #fff; color: #000; border: 4px solid #000; border-radius: 8px;
+            box-shadow: 0 6px 0 #000; text-transform: uppercase;
+        }
+        .btn-opcion:active { transform: translateY(6px); box-shadow: 0 0 0 #000; }
+        
+        .btn-tienda { background: #3498db; color: #fff; margin-top: 5px; border-color: #000; }
+        
+        .btn-empezar {
+            width: 100%; max-width: 280px; padding: 18px; font-size: 28px; font-weight: 900;
+            cursor: pointer; background: #ffcc00; color: #000; border: 4px solid #000; 
+            border-radius: 8px; text-transform: uppercase; box-shadow: 0 6px 0 #000;
+            animation: latido 1.5s infinite;
+        }
+        .btn-empezar:active { transform: translateY(6px); box-shadow: 0 0 0 #000; animation: none; }
+
+        @keyframes latido { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+
+        /* =========================================================
+           6. SHOP
+           ========================================================= */
+        #pantalla-tienda {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.95); color: white; display: none;
+            flex-direction: column; align-items: center;
+            z-index: 200; padding: 15px; width: 100%; height: 100%;
+        }
+        
+        #pantalla-tienda h1 { font-size: 45px; color: #ffcc00; margin-bottom: 5px; margin-top: 20px; text-shadow: 3px 3px 0 #000; }
+        #monedas-tienda { font-size: 24px; color: #ffeb3b; font-weight: bold; margin-bottom: 15px; text-shadow: 2px 2px 0 #000; }
+        
+        .lista-skins {
+            width: 100%; max-width: 400px; height: 550px; overflow-y: auto;
+            border: 4px solid #444; border-radius: 10px; padding: 15px;
+            background: #111;
+        }
+        
+        .lista-skins::-webkit-scrollbar { width: 8px; }
+        .lista-skins::-webkit-scrollbar-track { background: #0a0a0a; border-radius: 4px; }
+        .lista-skins::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        
+        .item-skin {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #1e1e1e; padding: 15px; border-radius: 8px; border: 2px solid #000;
+            margin-bottom: 15px; box-shadow: 0 4px 0 #000;
+        }
+        
+        .info-skin { display: flex; align-items: center; gap: 15px; }
+        
+        .preview-skin {
+            width: 45px; height: 45px; border: 2px solid #000; border-radius: 50%; position: relative;
+        }
+        .preview-skin::before {
+            content: ''; position: absolute; width: 18px; height: 10px; left: 58%; top: 44%;
+            background: #ffdb4d; border: 2px solid #000; border-radius: 4px 10px 10px 4px;
+            transform: translate(-50%, -50%) rotate(-10deg); z-index: 1;
+        }
+        .preview-skin::after {
+            content: ''; position: absolute; left: 28%; top: 25%; width: 8px; height: 8px;
+            background: #fff; border-radius: 50%; box-shadow: 2px 0 0 #000; z-index: 2;
+        }
+
+        .nombre-skin { font-size: 16px; font-weight: bold; width: 110px; line-height: 1.2; text-shadow: 1px 1px 0 #000; }
+        .precio-skin { font-size: 14px; color: #aaa; display: block; margin-top: 4px;}
+        
+        .btn-comprar {
+            padding: 10px; font-size: 14px; font-weight: bold; cursor: pointer; min-width: 90px;
+            background: #ffcc00; color: #000; border: 3px solid #000; border-radius: 6px;
+            box-shadow: 0 4px 0 #000; text-transform: uppercase; margin: 0;
+        }
+        .btn-comprar:active { transform: translateY(4px); box-shadow: 0 0 0 #000; }
+        .btn-comprado { background: #5eb24b; color: #fff; }
+        .btn-equipado { background: #666; color: #fff; cursor: default; box-shadow: 0 0 0 #000; transform: translateY(4px); border-color:#333; }
+        .btn-volver { background: #ff5656; color: #fff; margin-top: 15px; width: 90%; max-width: 300px; }
+    </style>
+</head>
+<body>
+
+    <audio id="musica-fondo" loop><source src="flappy bird 2 theme.mp3" type="audio/mpeg"></audio>
+    <audio id="musica-triste"><source src="sad violin meme.m4a" type="audio/mp4"></audio>
+
+    <div id="caja-juego">
+        
+        <div id="capa-noche"></div>
+        <div id="luna"></div>
+
+        <div id="marcador">0</div>
+        <div id="info-controles" class="hud-top">🖱️ Clic<br>⌨️ Espacio</div>
+        <div id="record-display" class="hud-top">Récord: 0</div>
+        <div id="display-monedas" class="hud-top">🪙 0</div>
+        
+        <div id="pajaro" class="skin-0"></div>
+
+        <div id="pantalla-inicio">
+            <h2 style="font-size: 40px; color: #fff; text-shadow: 3px 3px 0 #000; margin-bottom: 0;">FLAPPY BIRD 2:V</h2>
+            
+            <div id="paso-1" class="contenedor-pasos">
+                <h3 style="color:#ffcc00; font-size: 18px; text-transform: uppercase;">1. ¿En qué juegas?</h3>
+                <button id="btn-pc" class="btn-opcion" type="button">💻 PC / Laptop</button>
+                <button id="btn-movil" class="btn-opcion" type="button">📱 Teléfono / Tablet</button>
+            </div>
+
+            <div id="paso-2" class="contenedor-pasos" style="display:none;">
+                <h3 style="color:#ffcc00; font-size: 18px; text-transform: uppercase;">2. ¿Jugar con música?</h3>
+                <button id="btn-si" class="btn-opcion" style="background:#5eb24b; color:#fff;" type="button">SÍ 🎵</button>
+                <button id="btn-no" class="btn-opcion" style="background:#ff5656; color:#fff;" type="button">NO 🔇</button>
+            </div>
+
+            <div id="paso-3" class="contenedor-pasos" style="display:none; background: transparent; border: none; box-shadow: none;">
+                <button id="btn-empezar" class="btn-empezar" type="button">▶ JUGAR</button>
+                <button id="btn-abrir-tienda-1" class="btn-opcion btn-tienda" type="button">🛒 SHOP</button>
+            </div>
+        </div>
+        
+        <div id="pantalla-fin">
+            <h1>GAME OVER</h1>
+            <h2>Puntos: <span id="puntos-finales">0</span></h2>
+            <h2 class="texto-record">Récord: <span id="record-final">0</span></h2>
+            <h3 style="color:#ffeb3b; text-shadow: 2px 2px 0 #000;">+<span id="puntos-ganados">0</span> 🪙</h3>
+            
+            <div class="contenedor-pasos" style="background: transparent; border: none; box-shadow: none; margin-top: 0; padding-top: 0;">
+                <button id="btn-reiniciar" class="btn-empezar" type="button" style="animation:none;">REINTENTAR</button>
+                <button id="btn-abrir-tienda-2" class="btn-opcion btn-tienda" type="button">🛒 SHOP</button>
+            </div>
+        </div>
+
+        <div id="pantalla-tienda">
+            <h1>SHOP</h1>
+            <div id="monedas-tienda">Tus Monedas: 🪙 0</div>
+            
+            <div class="lista-skins" id="lista-skins">
+                <!-- Se inyecta con JS -->
+            </div>
+            
+            <button id="btn-cerrar-tienda" class="btn-opcion btn-volver" type="button">❌ VOLVER AL JUEGO</button>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================
+        // SISTEMA DE GUARDADO
+        // =========================================================
+        let recordActual = localStorage.getItem('flappyRecord2V') || 0;
+        let monedasActuales = parseInt(localStorage.getItem('flappyMonedas2V')) || 0;
+        let skinEquipada = parseInt(localStorage.getItem('flappySkinActiva2V')) || 0;
+        let skinsDesbloqueadas = JSON.parse(localStorage.getItem('flappySkins2V')) || [0];
+        
+        recordActual = parseInt(recordActual);
+        document.getElementById('record-display').innerText = "Récord: " + recordActual;
+        document.getElementById('display-monedas').innerText = "🪙 " + monedasActuales;
+
+        // CATÁLOGO DE SKINS
+        const catalogoSkins = [
+            { id: 0, nombre: "Clásico", precio: 0, claseCss: "skin-0" },
+            { id: 1, nombre: "Hielo", precio: 50, claseCss: "skin-1" },
+            { id: 2, nombre: "Tóxico", precio: 150, claseCss: "skin-2" },
+            { id: 3, nombre: "Sombra", precio: 300, claseCss: "skin-3" },
+            { id: 4, nombre: "Dorado", precio: 500, claseCss: "skin-4" },
+            { id: 5, nombre: "Dios Trueno", precio: 1000, claseCss: "skin-5" },
+            { id: 6, nombre: "Colmillo de Acero", precio: 2500, claseCss: "skin-6" },
+            { id: 7, nombre: "Fantasma Espartano", precio: 5000, claseCss: "skin-7" },
+            { id: 8, nombre: "Demonio Hanma", precio: 10000, claseCss: "skin-8" },
+            { id: 9, nombre: "Dragón del Vacío", precio: 15000, claseCss: "skin-9" }
+        ];
+
+        const caja = document.getElementById('caja-juego');
+        const pajaro = document.getElementById('pajaro');
+        const marcador = document.getElementById('marcador');
+        const infoControles = document.getElementById('info-controles');
+        
+        const pantallaInicio = document.getElementById('pantalla-inicio');
+        const pantallaFin = document.getElementById('pantalla-fin');
+        const pantallaTienda = document.getElementById('pantalla-tienda');
+        
+        const paso1 = document.getElementById('paso-1');
+        const paso2 = document.getElementById('paso-2');
+        const paso3 = document.getElementById('paso-3');
+        
+        const btnPc = document.getElementById('btn-pc');
+        const btnMovil = document.getElementById('btn-movil');
+        const btnSi = document.getElementById('btn-si');
+        const btnNo = document.getElementById('btn-no');
+        const btnEmpezar = document.getElementById('btn-empezar');
+        const btnReiniciar = document.getElementById('btn-reiniciar');
+        
+        const musicaFondo = document.getElementById('musica-fondo');
+        const musicaTriste = document.getElementById('musica-triste');
+        
+        actualizarSkinPajaro();
+
+        // MOTOR FÍSICO
+        const anchoCaja = 450, altoCaja = 750, tamanoPajaro = 45, anchoTubo = 70;
+        const gravedad = 2400, impulsoSalto = -590; 
+        const posicionXPajaro = 50, posicionInicioY = Math.floor((altoCaja - tamanoPajaro) / 2);
+        const intervaloTuberias = 1.1;
+
+        const velocidadTubosInicial = 300;
+        const espacioTubosInicial = 210;
+        let velocidadTubos = velocidadTubosInicial;
+        let espacioTubos = espacioTubosInicial;
+
+        let estadoJuego = 'inicio', velocidadY = 0, pajaroY = posicionInicioY;
+        let puntos = 0, tuberias = [], spawnTimer = 0, ultimoTimestamp = 0, requestId = null;
+        let puedeReiniciar = false, usarMusica = false; 
+
+        // =========================================================
+        // LÓGICA DE LA TIENDA
+        // =========================================================
+        document.getElementById('btn-abrir-tienda-1').addEventListener('click', (e) => { e.stopPropagation(); abrirTienda(); });
+        document.getElementById('btn-abrir-tienda-2').addEventListener('click', (e) => { e.stopPropagation(); abrirTienda(); });
+        document.getElementById('btn-cerrar-tienda').addEventListener('click', (e) => { e.stopPropagation(); cerrarTienda(); });
+
+        function abrirTienda() { pantallaTienda.style.display = 'flex'; renderizarTienda(); }
+        function cerrarTienda() { pantallaTienda.style.display = 'none'; }
+
+        function renderizarTienda() {
+            document.getElementById('monedas-tienda').innerText = "Tus Monedas: 🪙 " + monedasActuales;
+            const lista = document.getElementById('lista-skins');
+            lista.innerHTML = ""; 
+
+            catalogoSkins.forEach(skin => {
+                const item = document.createElement('div');
+                item.className = 'item-skin';
+                
+                const yaComprada = skinsDesbloqueadas.includes(skin.id);
+                const estaEquipada = skinEquipada === skin.id;
+                
+                let btnHTML = "";
+                if (estaEquipada) {
+                    btnHTML = `<button class="btn-comprar btn-equipado" disabled>USANDO</button>`;
+                } else if (yaComprada) {
+                    btnHTML = `<button class="btn-comprar btn-comprado" onclick="equiparSkin(${skin.id}, event)">PONER</button>`;
+                } else {
+                    btnHTML = `<button class="btn-comprar" onclick="comprarSkin(${skin.id}, ${skin.precio}, event)">🪙 ${skin.precio}</button>`;
+                }
+
+                let colorNombre = '#fff';
+                if(skin.precio >= 5000) colorNombre = '#ff3333';
+                else if(skin.precio >= 1000) colorNombre = '#00ffff';
+                else if(skin.precio >= 500) colorNombre = '#ffcc00';
+
+                item.innerHTML = `
+                    <div class="info-skin">
+                        <div class="preview-skin ${skin.claseCss}"></div>
+                        <div>
+                            <span class="nombre-skin" style="color: ${colorNombre};">${skin.nombre}</span>
+                            ${!yaComprada ? `<span class="precio-skin">Cuesta ${skin.precio}</span>` : `<span class="precio-skin" style="color:#5eb24b;">Comprada</span>`}
+                        </div>
+                    </div>
+                    ${btnHTML}
+                `;
+                lista.appendChild(item);
+            });
+        }
+
+        window.comprarSkin = function(id, precio, event) {
+            event.stopPropagation();
+            if (monedasActuales >= precio) {
+                monedasActuales -= precio;
+                skinsDesbloqueadas.push(id);
+                localStorage.setItem('flappyMonedas2V', monedasActuales);
+                localStorage.setItem('flappySkins2V', JSON.stringify(skinsDesbloqueadas));
+                document.getElementById('display-monedas').innerText = "🪙 " + monedasActuales;
+                renderizarTienda();
+            } else {
+                alert("¡Necesitas más monedas! Sigue entrenando para ganar más puntos.");
+            }
+        };
+
+        window.equiparSkin = function(id, event) {
+            event.stopPropagation();
+            skinEquipada = id;
+            localStorage.setItem('flappySkinActiva2V', skinEquipada);
+            actualizarSkinPajaro();
+            renderizarTienda();
+        };
+
+        function actualizarSkinPajaro() {
+            pajaro.className = '';
+            const skinData = catalogoSkins.find(s => s.id === skinEquipada);
+            if(skinData) pajaro.classList.add(skinData.claseCss);
+        }
+
+        // =========================================================
+        // MENÚ INICIAL Y SINTETIZADOR
+        // =========================================================
+        btnPc.addEventListener('click', (e) => { e.stopPropagation(); infoControles.innerHTML = "🖱️ Clic<br>⌨️ Espacio"; paso1.style.display = 'none'; paso2.style.display = 'block'; });
+        btnMovil.addEventListener('click', (e) => { e.stopPropagation(); infoControles.innerHTML = "👆 Tocar Pantalla"; paso1.style.display = 'none'; paso2.style.display = 'block'; });
+        btnSi.addEventListener('click', (e) => { e.stopPropagation(); usarMusica = true; paso2.style.display = 'none'; paso3.style.display = 'block'; });
+        btnNo.addEventListener('click', (e) => { e.stopPropagation(); usarMusica = false; paso2.style.display = 'none'; paso3.style.display = 'block'; });
+
+        btnEmpezar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            iniciarSintetizador(); 
+            if (usarMusica) { musicaFondo.volume = 0.4; musicaFondo.play().catch(err => console.log("Audio falló:", err)); }
+            arrancarJuegoNuevo();
+        });
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let contextoAudio;
+        function iniciarSintetizador() { if (!contextoAudio) contextoAudio = new AudioContext(); if (contextoAudio.state === 'suspended') contextoAudio.resume(); }
+        
+        function reproducirBipSalto() {
+            if (!contextoAudio) return;
+            const oscilador = contextoAudio.createOscillator();
+            const ganancia = contextoAudio.createGain();
+            oscilador.type = 'square'; 
+            oscilador.frequency.setValueAtTime(350, contextoAudio.currentTime);
+            oscilador.frequency.exponentialRampToValueAtTime(600, contextoAudio.currentTime + 0.1);
+            ganancia.gain.setValueAtTime(0.05, contextoAudio.currentTime);
+            ganancia.gain.exponentialRampToValueAtTime(0.001, contextoAudio.currentTime + 0.1);
+            oscilador.connect(ganancia); ganancia.connect(contextoAudio.destination);
+            oscilador.start(); oscilador.stop(contextoAudio.currentTime + 0.1);
+        }
+
+        function procesarSalto() { if (estadoJuego === 'jugando') { velocidadY = impulsoSalto; reproducirBipSalto(); } }
+        function reiniciarDesdeMuerte() { if (usarMusica) { musicaTriste.pause(); musicaFondo.currentTime = 0; musicaFondo.play().catch(e => {}); } arrancarJuegoNuevo(); }
+
+        caja.addEventListener('touchstart', function(e) { if (e.target.tagName === 'BUTTON') return; e.preventDefault(); if (estadoJuego === 'jugando') procesarSalto(); else if (estadoJuego === 'fin' && puedeReiniciar === true && pantallaTienda.style.display !== 'flex') reiniciarDesdeMuerte(); }, { passive: false });
+        caja.addEventListener('mousedown', function(e) { if (e.target.tagName === 'BUTTON') return; if (estadoJuego === 'jugando') procesarSalto(); else if (estadoJuego === 'fin' && puedeReiniciar === true && pantallaTienda.style.display !== 'flex') reiniciarDesdeMuerte(); });
+        window.addEventListener('keydown', function(e) { if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { if (estadoJuego === 'jugando') procesarSalto(); else if (estadoJuego === 'fin' && puedeReiniciar === true && pantallaTienda.style.display !== 'flex') reiniciarDesdeMuerte(); } } });
+        btnReiniciar.addEventListener('click', function(e) { e.stopPropagation(); if (puedeReiniciar) reiniciarDesdeMuerte(); });
+        document.querySelectorAll('button').forEach(btn => { btn.addEventListener('focus', function() { this.blur(); }); });
+
+        // --- MARGEN DE SEGURIDAD MÓVIL AL ESCALAR ---
+        establecerPosicionPajaro(posicionInicioY);
+        ajustarEscala();
+        window.addEventListener('resize', ajustarEscala);
+        function ajustarEscala() {
+            const anchoVentana = window.innerWidth; const altoVentana = window.innerHeight;
+            const escalaAncho = anchoVentana / anchoCaja; const escalaAlto = altoVentana / altoCaja;
+            caja.style.transform = `scale(${Math.min(escalaAncho, escalaAlto) * 0.98})`;
+        }
+
+        // =========================================================
+        // MOTOR DE JUEGO (GPU ACCELERATION)
+        // =========================================================
+        function arrancarJuegoNuevo() {
+            if (requestId !== null) cancelAnimationFrame(requestId);
+            limpiarTuberias();
+            caja.classList.remove('es-noche'); 
+            velocidadTubos = velocidadTubosInicial;
+            espacioTubos = espacioTubosInicial;
+
+            estadoJuego = 'jugando'; velocidadY = 0; pajaroY = posicionInicioY;
+            puntos = 0; spawnTimer = 0; ultimoTimestamp = 0; puedeReiniciar = false;
+            marcador.innerText = "0"; pantallaInicio.style.display = 'none'; pantallaFin.style.display = 'none';
+            establecerPosicionPajaro(pajaroY);
+            procesarSalto(); 
+            requestId = requestAnimationFrame(bucleJuego);
+        }
+
+        function bucleJuego(timestamp) {
+            if (ultimoTimestamp === 0) ultimoTimestamp = timestamp;
+            const delta = Math.min((timestamp - ultimoTimestamp) / 1000, 0.04);
+            ultimoTimestamp = timestamp;
+            actualizarJuego(delta);
+            if (estadoJuego === 'jugando') requestId = requestAnimationFrame(bucleJuego);
+        }
+
+        function actualizarJuego(delta) {
+            velocidadY += gravedad * delta; pajaroY += velocidadY * delta;
+            establecerPosicionPajaro(pajaroY);
+            
+            if (pajaroY < 0) { pajaroY = 0; velocidadY = 0; establecerPosicionPajaro(pajaroY); }
+            if (pajaroY + tamanoPajaro >= altoCaja) { pajaroY = altoCaja - tamanoPajaro; establecerPosicionPajaro(pajaroY); finalizarJuego(); return; }
+            
+            spawnTimer += delta;
+            if (spawnTimer >= intervaloTuberias) { generarTuberias(); spawnTimer -= intervaloTuberias; }
+            moverTuberias(delta);
+        }
+
+        function generarTuberias() {
+            const minAltura = 40, maxAltura = altoCaja - espacioTubos - 40;
+            const alturaSuperior = Math.floor(Math.random() * (maxAltura - minAltura + 1)) + minAltura;
+            const alturaInferior = altoCaja - espacioTubos - alturaSuperior;
+
+            const tuboArriba = document.createElement('div');
+            tuboArriba.className = 'tubo'; tuboArriba.style.height = `${alturaSuperior}px`;
+            tuboArriba.style.top = '0'; tuboArriba.style.left = '0px';
+            tuboArriba.style.transform = `translate3d(${anchoCaja}px, 0, 0)`;
+            caja.appendChild(tuboArriba);
+
+            const tuboAbajo = document.createElement('div');
+            tuboAbajo.className = 'tubo tubo-inferior'; tuboAbajo.style.height = `${alturaInferior}px`;
+            tuboAbajo.style.bottom = '0'; tuboAbajo.style.left = '0px';
+            tuboAbajo.style.transform = `translate3d(${anchoCaja}px, 0, 0)`;
+            caja.appendChild(tuboAbajo);
+
+            tuberias.push({ 
+                x: anchoCaja, domArriba: tuboArriba, domAbajo: tuboAbajo, 
+                alturaSuperior: alturaSuperior, espacioFisico: espacioTubos, puntado: false 
+            });
+        }
+
+        function moverTuberias(delta) {
+            for (let i = tuberias.length - 1; i >= 0; i--) {
+                const tubo = tuberias[i];
+                tubo.x -= velocidadTubos * delta;
+                
+                tubo.domArriba.style.transform = `translate3d(${tubo.x}px, 0, 0)`;
+                tubo.domAbajo.style.transform = `translate3d(${tubo.x}px, 0, 0)`;
+
+                if (colisionaConTubo(tubo)) finalizarJuego();
+
+                if (!tubo.puntado && tubo.x + anchoTubo < posicionXPajaro) {
+                    tubo.puntado = true; puntos += 1; marcador.innerText = String(puntos);
+                    velocidadTubos += 3; 
+                    if (espacioTubos > 135) { espacioTubos -= 1.5; }
+                    if (puntos >= 100) caja.classList.add('es-noche');
+                }
+
+                if (tubo.x < -anchoTubo) {
+                    tubo.domArriba.remove(); tubo.domAbajo.remove(); tuberias.splice(i, 1);
+                }
+            }
+        }
+
+        function colisionaConTubo(tubo) {
+            const radioPajaro = (tamanoPajaro / 2) - 3; 
+            const centroX = posicionXPajaro + (tamanoPajaro / 2);
+            const centroY = pajaroY + (tamanoPajaro / 2);
+
+            const rectArriba = { left: tubo.x, right: tubo.x + anchoTubo, top: 0, bottom: tubo.alturaSuperior + 20 };
+            const rectAbajo = { left: tubo.x, right: tubo.x + anchoTubo, top: tubo.alturaSuperior + tubo.espacioFisico - 20, bottom: altoCaja };
+            
+            function circuloTocaRectangulo(cx, cy, radio, rect) {
+                const puntoCercanoX = Math.max(rect.left, Math.min(cx, rect.right));
+                const puntoCercanoY = Math.max(rect.top, Math.min(cy, rect.bottom));
+                const distanciaX = cx - puntoCercanoX;
+                const distanciaY = cy - puntoCercanoY;
+                const distanciaReal = Math.sqrt((distanciaX * distanciaX) + (distanciaY * distanciaY));
+                return distanciaReal <= radio;
+            }
+
+            return circuloTocaRectangulo(centroX, centroY, radioPajaro, rectArriba) || 
+                   circuloTocaRectangulo(centroX, centroY, radioPajaro, rectAbajo);
+        }
+
+        function finalizarJuego() {
+            if (estadoJuego !== 'jugando') return;
+            estadoJuego = 'fin';
+            if (requestId !== null) cancelAnimationFrame(requestId);
+            
+            monedasActuales += puntos;
+            localStorage.setItem('flappyMonedas2V', monedasActuales);
+            document.getElementById('display-monedas').innerText = "🪙 " + monedasActuales;
+            document.getElementById('puntos-ganados').innerText = puntos;
+
+            if (puntos > recordActual) {
+                recordActual = puntos;
+                localStorage.setItem('flappyRecord2V', recordActual);
+                document.getElementById('record-display').innerText = "Récord: " + recordActual;
+            }
+            
+            document.getElementById('puntos-finales').innerText = puntos;
+            document.getElementById('record-final').innerText = recordActual;
+            pantallaFin.style.display = 'flex';
+            
+            if (usarMusica) {
+                try { 
+                    musicaFondo.pause(); 
+                    musicaTriste.currentTime = 0;
+                    musicaTriste.volume = 1.0;
+                    musicaTriste.play().catch(e => console.log(e));
+                } catch(e) {}
+            }
+            puedeReiniciar = false; setTimeout(function() { puedeReiniciar = true; }, 1000); 
+        }
+
+        function limpiarTuberias() { tuberias.forEach(function(tubo) { tubo.domArriba.remove(); tubo.domAbajo.remove(); }); tuberias = []; }
+        
+        function establecerPosicionPajaro(y) {
+            pajaroY = Math.max(0, Math.min(y, altoCaja - tamanoPajaro));
+            const rotacion = Math.min(Math.max(velocidadY * 0.05, -20), 45);
+            pajaro.style.transform = `translate3d(0, ${pajaroY}px, 0) rotate(${rotacion}deg)`;
+        }
+    </script>
+</body>
+</html>
